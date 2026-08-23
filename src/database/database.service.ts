@@ -1,17 +1,20 @@
-import { Injectable } from '@nestjs/common';
-import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from 'generated/prisma/client';
+import { EnvConfig } from 'src/config/env.config';
 
 @Injectable()
-export class DatabaseService {
-  private readonly filePath = join(process.cwd(), 'data', 'users.json');
-
-  read<T>(): T[] {
-    const raw = readFileSync(this.filePath, 'utf-8');
-    return JSON.parse(raw) as T[];
+export class DatabaseService extends PrismaClient implements OnModuleInit {
+  constructor(private readonly _configService: ConfigService<EnvConfig>) {
+    super({
+      adapter: new PrismaPg({
+        connectionString: _configService.get('DATABASE_URL'),
+      }),
+    });
   }
 
-  write<T>(data: T[]): void {
-    writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+  async onModuleInit() {
+    await this.$connect();
   }
 }

@@ -1,32 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User } from './user.interface';
+import { Prisma, User } from 'generated/prisma/client';
+import { DatabaseService } from 'src/database/database.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly _databaseService: DatabaseService) {}
 
-  findAll(): User[] {
-    return this.databaseService.read<User>();
+  async findAll(): Promise<User[]> {
+    return this._databaseService.user.findMany();
   }
 
-  create(dto: CreateUserDto): User {
-    const users = this.databaseService.read<User>();
-    const nextId = users.reduce((max, u) => Math.max(max, u.id), 0) + 1;
-    const user: User = { id: nextId, ...dto };
-    users.push(user);
-    this.databaseService.write(users);
-    return user;
+  async create(dto: CreateUserDto): Promise<User> {
+    return this._databaseService.user.create({ data: dto });
   }
 
-  remove(id: number): void {
-    const users = this.databaseService.read<User>();
-    const index = users.findIndex((u) => u.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`User with id ${id} not found`);
+  async remove(id: User['id']): Promise<void> {
+    try {
+      await this._databaseService.user.delete({ where: { id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`User with id ${id} not found`);
+      }
+      throw error;
     }
-    users.splice(index, 1);
-    this.databaseService.write(users);
   }
 }
